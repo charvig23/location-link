@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Share your location</title>
+<style>
+body{font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;background:#f6f7f9;padding:16px;box-sizing:border-box}
+.card{background:#fff;border-radius:14px;padding:24px;max-width:380px;text-align:center;box-shadow:0 2px 8px #0002}
+button{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:14px 22px;font-size:17px;width:100%}
+button:disabled{opacity:.6}
+p{color:#444;line-height:1.4}.small{font-size:13px;color:#777}
+</style></head><body>
+<div class="card">
+<h2>📍 Share your location</h2>
+<p>Tap the button and your browser will ask for permission. If you allow it, your <b>latitude and longitude</b> are sent to the person who gave you this link.</p>
+<button id="go">Share my location</button>
+<p id="msg" class="small">Nothing else is collected — no name, contacts, IP address or device info.</p>
+</div>
+<script>
+const id = location.pathname.split('/').pop();
+const btn = document.getElementById('go'), msg = document.getElementById('msg');
+btn.onclick = () => {
+  if (!navigator.geolocation) { msg.textContent = 'Location is not supported on this browser.'; return; }
+  btn.disabled = true; msg.textContent = 'Getting location...';
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    const r = await fetch(`/api/links/${id}/location`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, accuracy })
+    });
+    msg.textContent = r.ok ? '✅ Location shared. You can close this page.' : 'Something went wrong.';
+    btn.disabled = !r.ok;
+  }, (err) => {
+    btn.disabled = false;
+    msg.textContent = err.code === 1 ? 'Permission denied — nothing was shared.' : 'Could not get location. Try again.';
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+};
+</script></body></html>

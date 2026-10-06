@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Location Link</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:16px;background:#f6f7f9;color:#1a1a1a}
+.card{background:#fff;border-radius:12px;padding:16px;margin:12px 0;box-shadow:0 1px 3px #0002}
+button{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:16px;cursor:pointer}
+input{width:100%;padding:8px;font-size:14px;box-sizing:border-box;margin:8px 0}
+.loc{border-top:1px solid #eee;padding:10px 0}
+.muted{color:#666;font-size:13px}
+iframe{width:100%;height:180px;border:0;border-radius:8px;margin-top:6px}
+</style></head><body>
+<h2>📍 Location share links</h2>
+<div class="card">
+  <button id="new">Generate new link</button>
+  <div id="linkBox" hidden>
+    <p class="muted">Send this link to your phone / a person. They'll be asked for permission to share their location.</p>
+    <input id="link" readonly onclick="this.select()">
+    <button id="copy">Copy link</button>
+  </div>
+</div>
+<div class="card"><h3>Received locations</h3><div id="list" class="muted">No link yet.</div></div>
+<script>
+let cur = null, timer = null;
+const saved = () => { try { return JSON.parse(localStorage.getItem('link')); } catch { return null; } };
+function show(l) {
+  cur = l;
+  document.getElementById('linkBox').hidden = false;
+  document.getElementById('link').value = location.origin + '/l/' + l.id;
+  poll(); clearInterval(timer); timer = setInterval(poll, 4000);
+}
+async function poll() {
+  const r = await fetch(`/api/links/${cur.id}/locations?key=${cur.key}`);
+  if (!r.ok) return;
+  const { locations } = await r.json();
+  const el = document.getElementById('list');
+  if (!locations.length) { el.textContent = 'Waiting for someone to open the link...'; return; }
+  el.innerHTML = locations.slice().reverse().map(l => `
+    <div class="loc">
+      <b>${l.lat.toFixed(6)}, ${l.lng.toFixed(6)}</b>
+      <span class="muted">(+${l.accuracy ? Math.round(l.accuracy) + ' m' : '?'} ) - ${new Date(l.at).toLocaleString()}</span><br>
+      <a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank">Open in Google Maps</a>
+      <iframe loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${l.lng-.005},${l.lat-.003},${l.lng+.005},${l.lat+.003}&layer=mapnik"></iframe>
+    </div>`).join('');
+}
+document.getElementById('new').onclick = async () => {
+  const l = await (await fetch('/api/links', { method: 'POST' })).json();
+  try { localStorage.setItem('link', JSON.stringify(l)); } catch {}
+  show(l);
+};
+document.getElementById('copy').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('link').value);
+};
+const s = saved(); if (s) show(s);
+</script></body></html>
